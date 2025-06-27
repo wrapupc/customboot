@@ -11,9 +11,9 @@ import javax.annotation.Resource;
 import java.util.List;
 
 @SpringBootApplication
-@MapperScan(basePackages = "com.clls.customboot.dao.dynamic")
-@MapperScan(basePackages = "com.clls.customboot.dao.independent",
-        sqlSessionFactoryRef = "independentSqlSessionFactory")
+//@MapperScan(basePackages = "com.clls.customboot.dao.dynamic")
+//@MapperScan(basePackages = "com.clls.customboot.dao.independent",
+//        sqlSessionFactoryRef = "independentSqlSessionFactory")
 public class Application {
 
     @Resource

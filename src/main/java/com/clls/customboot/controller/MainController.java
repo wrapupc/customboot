@@ -15,7 +15,7 @@ public class MainController {
     MainService mainService;
 
     @RequestMapping("/getUser")
-//    @TargetDatasource(DatasourceType.ROOT)
+    @TargetDatasource(DatasourceType.INDEPENDENT)
     public Long getUser() {
 
         return mainService.getUser();

@@ -45,6 +45,7 @@ public class DatasourceConfig {
         Map<Object, Object> targetDataSources = new HashMap<>();
         targetDataSources.put(DatasourceType.ROOT, root());
         targetDataSources.put(DatasourceType.RO, ro());
+        targetDataSources.put(DatasourceType.INDEPENDENT, independent());
 
         DynamicDatasource dynamicDataSource = new DynamicDatasource();
         dynamicDataSource.setTargetDataSources(targetDataSources);
@@ -52,7 +53,7 @@ public class DatasourceConfig {
         return dynamicDataSource;
     }
 
-    @Bean
+    @Bean("ds1SqlSessionFactory")
     @Primary
     public SqlSessionFactory sqlSessionFactory() throws Exception {
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
@@ -71,16 +72,16 @@ public class DatasourceConfig {
         return factoryBean.getObject();
     }
 
-    @Bean("transactionManager")
-    @Primary
-    public PlatformTransactionManager transactionManager() {
-        return new DataSourceTransactionManager(dynamicDataSource());
-    }
-
-    @Bean("independentTransactionManager")
-    public PlatformTransactionManager independentTransactionManager() {
-        return new DataSourceTransactionManager(independent());
-    }
+//    @Bean("transactionManager")
+//    @Primary
+//    public PlatformTransactionManager transactionManager() {
+//        return new DataSourceTransactionManager(dynamicDataSource());
+//    }
+//
+//    @Bean("independentTransactionManager")
+//    public PlatformTransactionManager independentTransactionManager() {
+//        return new DataSourceTransactionManager(independent());
+//    }
 
     public static class DynamicDatasource extends AbstractRoutingDataSource {
         @Override
