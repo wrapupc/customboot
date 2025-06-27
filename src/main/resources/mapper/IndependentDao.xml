@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.clls.customboot.dao.independent.IndependentDao">
+
+    <select id="getMockUser" resultType="Long">
+        select user_id
+        from mock_user
+        where user_id = 1
+        limit 100;
+    </select>
+
+    <update id="insertMockUser">
+        insert into mock_user
+            (user_id, username)
+        values (33, 'kkx')
+    </update>
+</mapper>

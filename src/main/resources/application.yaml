@@ -1,0 +1,29 @@
+spring:
+  application:
+   name: customboot
+  datasource:
+    druid:
+      maxActive: 100
+      minIdle: 20
+    root:
+      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+      username: root
+      password: root
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    ro:
+      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+      username: ro
+      password: root
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    independent:
+      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+      username: independent
+      password: root
+      driver-class-name: com.mysql.cj.jdbc.Driver
+logging:
+  level:
+    com:
+      clls:
+        customboot:
+          dao: DEBUG
+    org.mybatis: DEBUG
