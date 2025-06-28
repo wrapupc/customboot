@@ -15,7 +15,7 @@ public class MainService {
     IndependentDao independentDao;
 
 
-    @Transactional(rollbackFor = Exception.class)
+//    @Transactional(rollbackFor = Exception.class)
     public Long getUser() {
 //        testDao.updateMockUser(1L);
 //        int a = 1 / 0;

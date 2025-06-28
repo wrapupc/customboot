@@ -2,17 +2,18 @@ package framework.config;
 
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceBuilder;
+import com.clls.customboot.config.DynamicDataSource;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.SqlSessionFactoryBean;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.boot.autoconfigure.SpringBootVFS;
 import org.mybatis.spring.mapper.ClassPathMapperScanner;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.RuntimeBeanReference;
 import org.springframework.beans.factory.support.*;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.context.properties.bind.Bindable;
@@ -23,10 +24,10 @@ import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.type.AnnotationMetadata;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
@@ -40,15 +41,15 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
     @Override
     public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
         List<String> packages = AutoConfigurationPackages.get(this.applicationContext);
-        final String jdbcPropertyPrefix = "spring.datasource";
+        final String jdbcPropertyPrefix = "spring.datasource.enhance";
 
-        Map<String, JdbcProperty> jdbcPropertyMap = Binder.get(env)
-                .bind(jdbcPropertyPrefix, Bindable.mapOf(String.class, JdbcProperty.class))
+        Map<String, DataSourceProperty> dataSourcePropertyMap = Binder.get(env)
+                .bind(jdbcPropertyPrefix, Bindable.mapOf(String.class, DataSourceProperty.class))
                 .orElseGet(Collections::emptyMap);
 
-        jdbcPropertyMap = jdbcPropertyMap.entrySet().stream().filter(item -> item.getValue().isEnabled()).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        dataSourcePropertyMap = dataSourcePropertyMap.entrySet().stream().filter(item -> item.getValue().isEnabled()).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        if (jdbcPropertyMap.isEmpty()) {
+        if (dataSourcePropertyMap.isEmpty()) {
             return;
         }
 
@@ -58,17 +59,79 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
                 .bind(druidPropertyPrefix, Bindable.of(Properties.class))
                 .orElse(new Properties());
 
-        jdbcPropertyMap.forEach((dbName, property) -> {
-            final String beanNamePrefix = getBeanNamePrefix(dbName, property);
+        Map<String, List<Map.Entry<String, DataSourceProperty>>> dynamicDataSourcePropertyMap = dataSourcePropertyMap.entrySet().stream().filter(entry -> entry.getValue().isEnableDynamicDataSource())
+                .collect(Collectors.groupingBy(item -> item.getValue().getDynamicDataSourceGroupName(), Collectors.toList()));
 
-            final AutowireCandidateQualifier qualifier = new AutowireCandidateQualifier(Qualifier.class, beanNamePrefix);
+        dynamicDataSourcePropertyMap.forEach((dsPrefix, propertyList) -> {
+            final String dsName = dsPrefix + "DataSource";
 
+            final AutowireCandidateQualifier qualifier = new AutowireCandidateQualifier(Qualifier.class, dsPrefix);
             final Consumer<AbstractBeanDefinition> bdConsumer = (bd) -> {
                 bd.addQualifier(qualifier);
             };
 
+            /* register normal datasource for dynamic datasource */
+            propertyList.forEach((dsPropertyEntry) -> {
+                final String dbName = dsPropertyEntry.getKey();
+                final String normalDsName = dbName + "DataSource";
+
+                if (registry.containsBeanDefinition(normalDsName)) {
+                    AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) registry.getBeanDefinition(normalDsName);
+                    bdConsumer.accept(beanDefinition);
+                } else {
+                    registerBean(registry, DataSource.class, normalDsName, b -> {
+                    }, bdConsumer, bd -> bd.setInstanceSupplier(() -> {
+                        DruidDataSource bean = DruidDataSourceBuilder.create().build();
+                        bean.configFromPropeties(druidProperties);
+                        Bindable<DruidDataSource> bindable =
+                                Bindable.of(DruidDataSource.class).withExistingValue(bean);
+                        return Binder.get(env).bind(jdbcPropertyPrefix + "." + dbName, bindable).get();
+                    }));
+                }
+            });
+
+            /* register dynamic datasource*/
+            ManagedMap<Object, Object> targetDataSources = new ManagedMap<>();
+            List<String> defaultDataSourceBeanName = new ArrayList<>();
+
+            propertyList.forEach(dsPropertyEntry -> {
+                String dbName = dsPropertyEntry.getKey();
+                String normalDsName = dbName + "DataSource";
+
+                // 直接添加 RuntimeBeanReference
+                targetDataSources.put(dbName, new RuntimeBeanReference(normalDsName));
+
+                if (defaultDataSourceBeanName.isEmpty()) {
+                    defaultDataSourceBeanName.add("roDataSource"); // TODO: read default from config
+                }
+            });
+
+            // 注册动态数据源Bean
+            registerBean(registry, DynamicDataSource.class, dsName, b -> {
+                // Spring会自动解析ManagedMap中的RuntimeBeanReference
+                b.addPropertyValue("targetDataSources", targetDataSources);
+
+                // 添加默认数据源
+                b.addPropertyValue("defaultTargetDataSource",
+                        new RuntimeBeanReference(defaultDataSourceBeanName.get(0)));
+            }, bd -> {
+                bd.addQualifier(new AutowireCandidateQualifier(Qualifier.class, dsPrefix));
+            });
+
+        });
+
+        Map<String, List<Map.Entry<String, DataSourceProperty>>> normalDataSourcePropertyMap = dataSourcePropertyMap.entrySet().stream().filter(entry -> !entry.getValue().isEnableDynamicDataSource())
+                .collect(Collectors.groupingBy(item -> item.getValue().getDynamicDataSourceGroupName(), Collectors.toList()));
+
+        dataSourcePropertyMap.forEach((dbName, property) -> {
             /* register DataSource.class*/
+            final String beanNamePrefix = getBeanNamePrefix(dbName, property);
             final String dsName = beanNamePrefix + "DataSource";
+
+            final AutowireCandidateQualifier qualifier = new AutowireCandidateQualifier(Qualifier.class, beanNamePrefix);
+            final Consumer<AbstractBeanDefinition> bdConsumer = (bd) -> {
+                bd.addQualifier(qualifier);
+            };
 
             if (registry.containsBeanDefinition(dsName)) {
                 AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) registry.getBeanDefinition(dsName);
@@ -83,7 +146,18 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
                     return Binder.get(env).bind(jdbcPropertyPrefix + "." + dbName, bindable).get();
                 }));
             }
+        });
 
+        dataSourcePropertyMap.forEach((dbName, property) -> {
+            final String beanNamePrefix = getBeanNamePrefix(dbName, property);
+
+            final AutowireCandidateQualifier qualifier = new AutowireCandidateQualifier(Qualifier.class, beanNamePrefix);
+            final Consumer<AbstractBeanDefinition> bdConsumer = (bd) -> {
+                bd.addQualifier(qualifier);
+            };
+
+
+            final String dsName = beanNamePrefix + "DataSource";
             /* register TransactionManager.class*/
             String txManagerName = beanNamePrefix + "TransactionManager";
             if (registry.containsBeanDefinition(txManagerName)) {
@@ -112,16 +186,23 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
             }
 
             /* register JdbcTemplate.class*/
-//            registerBean(registry,
-//                    JdbcTemplate.class,
-//                    beanNamePrefix + "JdbcTemplate",
-//                    b -> b.addConstructorArgReference(dsName),
-//                    bdConsumer);
+//            String jdbcTemplateName = beanNamePrefix + "JdbcTemplate";
+//
+//            if (registry.containsBeanDefinition(jdbcTemplateName)) {
+//                AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) registry.getBeanDefinition(jdbcTemplateName);
+//                bdConsumer.accept(beanDefinition);
+//            } else {
+//                registerBean(registry,
+//                        JdbcTemplate.class,
+//                        jdbcTemplateName,
+//                        b -> b.addConstructorArgReference(dsName),
+//                        bdConsumer);
+//            }
 
             /* configure mybatis bean*/
             {
                 /* register SqlSessionFactory.class*/
-                String sqlSessionFactoryName = beanNamePrefix + "sqlSessionFactory";
+                String sqlSessionFactoryName = beanNamePrefix + "SqlSessionFactory";
                 if (registry.containsBeanDefinition(sqlSessionFactoryName)) {
                     AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) registry.getBeanDefinition(sqlSessionFactoryName);
                     bdConsumer.accept(beanDefinition);
@@ -131,7 +212,7 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
                             sqlSessionFactoryName,
                             bd -> {
                                 bd.addPropertyReference("dataSource", dsName);
-                                bd.addPropertyValue("vfs", SpringBootVFS.class);
+//                                bd.addPropertyValue("vfs", SpringBootVFS.class);
 
 //                            String configPattern = "classpath:/" + dbName + "-mybatis-config.xml";
 //                            Resource configLocation = null;
@@ -150,6 +231,7 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
 //                            }
 
 
+//                                String locationPattern = "classpath:/mapper/" + dbName + "/*.xml";
                                 String locationPattern = "classpath:/mapper/" + dbName + "/*.xml";
                                 Resource[] locations = null;
                                 try {
@@ -166,11 +248,17 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
             }
 
             /* register SqlSessionTemplate.class*/
-//            registerBean(registry,
-//                    SqlSessionTemplate.class,
-//                    beanNamePrefix + "SqlSessionTemplate",
-//                    bd -> bd.addConstructorArgReference(beanNamePrefix + "SqlSessionFactory"),
-//                    bdConsumer);
+//            final String sqlSessionTemplateName = beanNamePrefix + "SqlSessionTemplate";
+//            if (registry.containsBeanDefinition(sqlSessionTemplateName)) {
+//                AbstractBeanDefinition beanDefinition = (AbstractBeanDefinition) registry.getBeanDefinition(sqlSessionTemplateName);
+//                bdConsumer.accept(beanDefinition);
+//            } else {
+//                registerBean(registry,
+//                        SqlSessionTemplate.class,
+//                        sqlSessionTemplateName,
+//                        bd -> bd.addConstructorArgReference(beanNamePrefix + "SqlSessionFactory"),
+//                        bdConsumer);
+//            }
 
             /* configure MapperScanner */
             ClassPathMapperScanner scanner = new ClassPathMapperScanner(registry) {
@@ -230,25 +318,27 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
         registry.registerBeanDefinition(beanName, builder.getBeanDefinition());
     }
 
-    private static String getBeanNamePrefix(String dbName, JdbcProperty property) {
+    private static String getBeanNamePrefix(String dbName, DataSourceProperty property) {
         if (!property.isEnableDynamicDataSource()) {
             return dbName;
         }
         String dynamicDataSourceGroupName = property.getDynamicDataSourceGroupName();
         if (dynamicDataSourceGroupName == null || dynamicDataSourceGroupName.isEmpty()) {
-            return dbName;
+            throw new RuntimeException("must specify dynamic data source group name if enabled!");
         }
         return dynamicDataSourceGroupName;
     }
 
 
     @Data
-    public static class JdbcProperty {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DataSourceProperty {
         private boolean enabled = true;
         private boolean primary = false;
         private String url;
 
         private boolean enableDynamicDataSource = true;
         private String dynamicDataSourceGroupName;
+        private boolean isDynamicDefaultDataSource = false;
     }
 }

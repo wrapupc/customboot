@@ -2,27 +2,28 @@ spring:
   application:
    name: customboot
   datasource:
-    druid:
-      maxActive: 100
-      minIdle: 20
-    root:
-      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
-      username: root
-      password: root
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      dynamicDataSourceGroupName: ds1
-    ro:
-      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
-      username: ro
-      password: root
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      dynamicDataSourceGroupName: ds1
-    independent:
-      url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
-      username: independent
-      password: root
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      dynamicDataSourceGroupName: ds1
+    enhance:
+      druid:
+        maxActive: 100
+        minIdle: 20
+      root:
+        url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+        username: root
+        password: root
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        dynamicDataSourceGroupName: ds1
+      ro:
+        url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+        username: ro
+        password: root
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        dynamicDataSourceGroupName: ds1
+      independent:
+        url: jdbc:mysql://localhost:3306/test?zeroDateTimeBehavior=convertToNull&useUnicode=true&useSSL=true&characterEncoding=utf-8&autoReconnect=true&useLocalSessionState=true&serverTimezone=Asia/Shanghai
+        username: independent
+        password: root
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        dynamicDataSourceGroupName: ds1
 logging:
   level:
     com:

@@ -7,8 +7,8 @@ public class DatasourceContextHolder {
         CONTEXT.set(type);
     }
 
-    public static DatasourceType getDatasourceType() {
-        return CONTEXT.get() == null ? DatasourceType.ROOT : CONTEXT.get();
+    public static String getDatasourceType() {
+        return CONTEXT.get() == null ? DatasourceType.ROOT.getValue() : CONTEXT.get().getValue();
     }
 
     public static void clear() {
