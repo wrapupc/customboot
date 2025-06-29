@@ -23,6 +23,7 @@ spring:
         username: independent
         password: root
         driver-class-name: com.mysql.cj.jdbc.Driver
+        enableDynamicDataSource: false
         dynamicDataSourceGroupName: ds1
 logging:
   level:

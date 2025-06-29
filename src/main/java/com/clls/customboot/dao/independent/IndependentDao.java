@@ -5,7 +5,7 @@ import org.apache.ibatis.annotations.Param;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 @Mapper
-@Qualifier("ds1")
+@Qualifier("independent")
 public interface IndependentDao {
     Long getMockUser(@Param("userId") Long userId);
     void insertMockUser(@Param("userId") Long userId);

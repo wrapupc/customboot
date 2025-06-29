@@ -102,7 +102,7 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
                 targetDataSources.put(dbName, new RuntimeBeanReference(normalDsName));
 
                 if (defaultDataSourceBeanName.isEmpty()) {
-                    defaultDataSourceBeanName.add("roDataSource"); // TODO: read default from config
+                    defaultDataSourceBeanName.add(normalDsName); // TODO: read default from config
                 }
             });
 
@@ -125,6 +125,7 @@ public class DataSourceConfigurer implements BeanDefinitionRegistryPostProcessor
 
         dataSourcePropertyMap.forEach((dbName, property) -> {
             /* register DataSource.class*/
+            //TODO: split normal datasource register
             final String beanNamePrefix = getBeanNamePrefix(dbName, property);
             final String dsName = beanNamePrefix + "DataSource";
 
